@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/fmsca_records/static/css/main.e6c13ad2.css",
+    "main.js": "/fmsca_records/static/js/main.7da3f54e.js",
+    "static/js/453.b0477a18.chunk.js": "/fmsca_records/static/js/453.b0477a18.chunk.js",
+    "index.html": "/fmsca_records/index.html",
+    "main.e6c13ad2.css.map": "/fmsca_records/static/css/main.e6c13ad2.css.map",
+    "main.7da3f54e.js.map": "/fmsca_records/static/js/main.7da3f54e.js.map",
+    "453.b0477a18.chunk.js.map": "/fmsca_records/static/js/453.b0477a18.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.7da3f54e.js"
+  ]
+}

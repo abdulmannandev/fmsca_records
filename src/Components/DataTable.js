@@ -1,189 +1,290 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, TextField, Select, MenuItem, FormControl, InputLabel, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  TextField,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
+  Paper,
+  Button,
+  Typography,
+  Modal,
+  Box
 } from '@mui/material';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import ClearIcon from '@mui/icons-material/Clear';
-import DetailDialog from './DetailDialog';
-import data from "../data.json";
+import { useTable, useSortBy, usePagination, useGlobalFilter } from 'react-table';
+import LZString from 'lz-string';
+import BarGraph from './BarGraph';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
-const columns = [
-  { id: 'created_dt', label: 'Created_DT', type: 'text' },
-  { id: 'data_source_modified_dt', label: 'Modified_DT', type: 'text' },
-  { id: 'operating_status', label: 'Operating Status', type: 'select' },
-  { id: 'legal_name', label: 'Legal Name', type: 'text' },
-  { id: 'dba_name', label: 'DBA Name', type: 'text' },
-  { id: 'physical_address', label: 'Physical Address', type: 'text' },
-  { id: 'phone', label: 'Phone', type: 'text' },
-  { id: 'usdot_number', label: 'DOT', type: 'text' },
-  { id: 'mc_mx_ff_number', label: 'MC/MX/FF', type: 'text' },
-  { id: 'power_units', label: 'Power Units', type: 'text' },
-  { id: 'out_of_service_date', label: 'Out of Service Date', type: 'text' },
-];
-
-const getUniqueOptions = (data, columnId) => {
-  return [...new Set(data.map(item => item[columnId]))];
+// Modal styles
+const modalStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 400,
+  bgcolor: 'background.paper',
+  border: '2px solid #000',
+  boxShadow: 24,
+  p: 4,
 };
 
-const DataTable = () => {
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [filters, setFilters] = useState({});
-  const [openFilterDialog, setOpenFilterDialog] = useState(false);
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [openDetailDialog, setOpenDetailDialog] = useState(false);
+const DataTable = ({ columns, data, onSettingsChange, settings }) => {
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [editedData, setEditedData] = useState(data);
+  const [editingCell, setEditingCell] = useState(null);
+  const [openModal, setOpenModal] = useState(false);
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(+event.target.value);
-    setPage(0);
-  };
-
-  const handleFilterChange = (event, columnId) => {
-    const newFilters = { ...filters, [columnId]: event.target.value };
-    setFilters(newFilters);
-  };
-
-  const clearFilter = (columnId) => {
-    const newFilters = { ...filters, [columnId]: '' };
-    setFilters(newFilters);
-  };
-
-  const handleRowClick = (row) => {
-    setSelectedRow(row);
-    setOpenDetailDialog(true);
-  };
-
-  const handleCloseDetailDialog = () => {
-    setOpenDetailDialog(false);
-  };
-
-  const filteredData = data.filter((row) =>
-    columns.every((column) => {
-      const filterValue = filters[column.id];
-      if (!filterValue) return true;
-      return String(row[column.id]).toLowerCase().includes(filterValue.toLowerCase());
-    })
+  const {
+    getTableProps,
+    getTableBodyProps,
+    headerGroups,
+    page,
+    prepareRow,
+    setPageSize,
+    state
+  } = useTable(
+    {
+      columns,
+      data: editedData,
+      initialState: settings.table || { pageIndex: 0, pageSize: 10 }
+    },
+    useGlobalFilter,
+    useSortBy,
+    usePagination
   );
-
-  const columnOptions = useMemo(() => {
-    const options = {};
-    columns.forEach(column => {
-      if (column.type === 'select') {
-        options[column.id] = getUniqueOptions(data, column.id);
+  
+  const loadData = () => {
+    const compressedData = localStorage.getItem('tableData');
+    if (compressedData) {
+      const decompressedData = LZString.decompress(compressedData);
+      if (decompressedData) {
+        setEditedData(JSON.parse(decompressedData));
       }
-    });
-    return options;
-  }, [data]);
-
-  const handleOpenFilterDialog = () => {
-    setOpenFilterDialog(true);
+    }
   };
 
-  const handleCloseFilterDialog = () => {
-    setOpenFilterDialog(false);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    onSettingsChange({ ...settings, table: state });
+  }, [state]);
+
+  const handleCellChange = (rowIndex, columnId, value) => {
+    const newData = [...editedData];
+    newData[rowIndex] = {
+      ...newData[rowIndex],
+      [columnId]: value
+    };
+    setEditedData(newData);
+    const compressedData = LZString.compress(JSON.stringify(newData));
+    localStorage.setItem('tableData', compressedData);
   };
+
+  const handleCellClick = (rowIndex, columnId) => {
+    setEditingCell({ rowIndex, columnId });
+  };
+
+  const handleCellBlur = () => {
+    setEditingCell(null);
+  };
+
+  const handleInputChange = (e) => {
+    const { value } = e.target;
+    if (editingCell) {
+      const { rowIndex, columnId } = editingCell;
+      handleCellChange(rowIndex, columnId, value);
+    }
+  };
+
+  const handleDateChange = (date) => {
+    if (editingCell) {
+      const { rowIndex, columnId } = editingCell;
+      handleCellChange(rowIndex, columnId, date ? date.toISOString() : '');
+    }
+  };
+
+  const handleSelectChange = (e) => {
+    const { value } = e.target;
+    if (editingCell) {
+      const { rowIndex, columnId } = editingCell;
+      handleCellChange(rowIndex, columnId, value);
+    }
+  };
+
+  const getUniqueOptions = (columnId) => {
+    const uniqueValues = [...new Set(editedData.map(row => row[columnId]))];
+    return uniqueValues.map(value => (
+      <MenuItem key={value} value={value}>
+        {value}
+      </MenuItem>
+    ));
+  };
+
+  const tableData = page.map(row => {
+    prepareRow(row);
+    return row;
+  });
+
+  // Generate chart data
+  const barChartData = editedData
+    .filter(d => d.out_of_service_date)
+    .reduce((acc, cur) => {
+      const month = new Date(cur.out_of_service_date).toLocaleString('default', { month: 'short' });
+      acc[month] = (acc[month] || 0) + 1;
+      return acc;
+    }, {});
+
+  const barChartDataArray = Object.keys(barChartData).map(month => ({
+    month,
+    count: barChartData[month]
+  }));
 
   return (
-    <Paper>
-      <TableContainer>
-        <Table aria-label="data table">
+    <>
+      <Box display="flex" justifyContent="space-between" alignItems="center" p={2}>
+        <Typography variant="h6">Data Table</Typography>
+        <Button variant="contained" color="primary" onClick={() => setOpenModal(true)}>
+          Save/Load View
+        </Button>
+      </Box>
+
+      <TextField
+        label="Search"
+        variant="outlined"
+        onChange={(e) => setGlobalFilter(e.target.value)}
+        value={globalFilter}
+        style={{ margin: '20px 0', width: '100%' }}
+      />
+
+      <TableContainer component={Paper}>
+        <Table {...getTableProps()} size="small">
           <TableHead>
-            <TableRow>
-              {columns.map((column) => (
-                <TableCell key={column.id}>
-                  {column.label}
-                </TableCell>
-              ))}
-              <TableCell>
-                <IconButton onClick={handleOpenFilterDialog}>
-                  <FilterListIcon />
-                </IconButton>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, rowIndex) => (
-              <TableRow key={rowIndex} onClick={() => handleRowClick(row)} style={{ cursor: 'pointer' }}>
-                {columns.map((column) => (
-                  <TableCell key={column.id}>{row[column.id] !== null ? row[column.id] : 'N/A'}</TableCell>
+            {headerGroups.map(headerGroup => (
+              <TableRow {...headerGroup.getHeaderGroupProps()} sx={{ backgroundColor: '#f5f5f5' }}>
+                {headerGroup.headers.map(column => (
+                  <TableCell {...column.getHeaderProps(column.getSortByToggleProps())} sx={{ fontWeight: 'bold' }}>
+                    {column.render('Header')}
+                    {column.isSorted ? (column.isSortedDesc ? ' 🔽' : ' 🔼') : ''}
+                    {column.canFilter ? column.render('Filter') : null}
+                  </TableCell>
                 ))}
               </TableRow>
             ))}
+          </TableHead>
+          <TableBody {...getTableBodyProps()}>
+            {tableData.map((row, rowIndex) => {
+              prepareRow(row);
+              return (
+                <TableRow key={rowIndex} {...row.getRowProps()} sx={{ '&:nth-of-type(odd)': { backgroundColor: '#fafafa' } }}>
+                  {row.cells.map(cell => (
+                    <TableCell
+                      key={cell.column.id}
+                      {...cell.getCellProps()}
+                      onClick={() => handleCellClick(rowIndex, cell.column.id)}
+                      sx={{ cursor: 'pointer' }}
+                    >
+                      {editingCell?.rowIndex === rowIndex && editingCell.columnId === cell.column.id ? (
+                        cell.column.type === 'date' ? (
+                          <DatePicker
+                            selected={cell.value ? new Date(cell.value) : null}
+                            onChange={handleDateChange}
+                            onBlur={handleCellBlur}
+                            autoFocus
+                          />
+                        ) : cell.column.type === 'select' ? (
+                          <FormControl fullWidth>
+                            <InputLabel>{cell.column.Header}</InputLabel>
+                            <Select
+                              value={cell.value || ''}
+                              onChange={handleSelectChange}
+                              onBlur={handleCellBlur}
+                              autoFocus
+                            >
+                              {getUniqueOptions(cell.column.id)}
+                            </Select>
+                          </FormControl>
+                        ) : (
+                          <TextField
+                            value={cell.value || ''}
+                            onChange={handleInputChange}
+                            onBlur={handleCellBlur}
+                            autoFocus
+                            fullWidth
+                          />
+                        )
+                      ) : (
+                        cell.render('Cell')
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
+
       <TablePagination
-        rowsPerPageOptions={[5, 10, 25]}
+        rowsPerPageOptions={[10, 25, 50]}
         component="div"
-        count={filteredData.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
+        count={editedData.length}
+        rowsPerPage={state.pageSize}
+        page={state.pageIndex}
+        onPageChange={(event, newPage) => {
+          setPageSize(newPage);
+          onSettingsChange({ ...settings, table: { ...state, pageIndex: newPage } });
+        }}
+        onRowsPerPageChange={(event) => {
+          setPageSize(parseInt(event.target.value, 10));
+          onSettingsChange({ ...settings, table: { ...state, pageSize: parseInt(event.target.value, 10) } });
+        }}
       />
-      <Dialog open={openFilterDialog} onClose={handleCloseFilterDialog}>
-        <DialogTitle>Filter Columns</DialogTitle>
-        <DialogContent>
-          {columns.map((column) => (
-            <div key={column.id}>
-              {column.type === 'text' ? (
-                <TextField
-                  value={filters[column.id] || ''}
-                  onChange={(event) => handleFilterChange(event, column.id)}
-                  placeholder={`Filter ${column.label}`}
-                  variant="standard"
-                  size="small"
-                  fullWidth
-                  InputProps={{
-                    endAdornment: (
-                      <IconButton onClick={() => clearFilter(column.id)}>
-                        <ClearIcon />
-                      </IconButton>
-                    )
-                  }}
-                />
-              ) : (
-                <FormControl variant="standard" size="small" fullWidth>
-                  <InputLabel>{`Filter ${column.label}`}</InputLabel>
-                  <Select
-                    value={filters[column.id] || ''}
-                    onChange={(event) => handleFilterChange(event, column.id)}
-                    label={`Filter ${column.label}`}
-                    endAdornment={
-                      <IconButton onClick={() => clearFilter(column.id)}>
-                        <ClearIcon />
-                      </IconButton>
-                    }
-                  >
-                    <MenuItem value=""><em>None</em></MenuItem>
-                    {columnOptions[column.id].map((option) => (
-                      <MenuItem key={option} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-            </div>
-          ))}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseFilterDialog} color="primary">Close</Button>
-        </DialogActions>
-      </Dialog>
-      {selectedRow && (
-        <DetailDialog
-          open={openDetailDialog}
-          onClose={handleCloseDetailDialog}
-          rowData={selectedRow}
-          columns={columns}
-        />
-      )}
-    </Paper>
+
+      <BarGraph data={barChartDataArray} />
+
+      {/* Modal for saving/loading views */}
+      <Modal
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+      >
+        <Box sx={modalStyle}>
+          <Typography variant="h6" component="h2">Save/Load View</Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              // Implement save functionality
+              setOpenModal(false);
+            }}
+            sx={{ mt: 2, mr: 1 }}
+          >
+            Save
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => {
+              // Implement load functionality
+              setOpenModal(false);
+            }}
+            sx={{ mt: 2 }}
+          >
+            Load
+          </Button>
+        </Box>
+      </Modal>
+    </>
   );
 };
 

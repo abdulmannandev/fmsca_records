@@ -39,7 +39,7 @@ const modalStyle = {
 
 const DataTable = ({ columns, data, onSettingsChange, settings }) => {
   const [globalFilter, setGlobalFilter] = useState('');
-  const [editedData, setEditedData] = useState(data);
+  const [editedData, setEditedData] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
   const [openModal, setOpenModal] = useState(false);
 
@@ -64,12 +64,21 @@ const DataTable = ({ columns, data, onSettingsChange, settings }) => {
   
   const loadData = () => {
     const compressedData = localStorage.getItem('tableData');
+    const tempData = [...data];
     if (compressedData) {
       const decompressedData = LZString.decompress(compressedData);
       if (decompressedData) {
-        setEditedData(JSON.parse(decompressedData));
+        const decompressedDataParsed = JSON.parse(decompressedData)
+        const decompressedDataKeys = Object.keys(decompressedDataParsed);
+        if (decompressedDataKeys?.length) {
+          decompressedDataKeys.forEach((key) => {
+            const item = decompressedDataParsed[key];
+            tempData[key] = item;
+          })
+        }
       }
     }
+    setEditedData(tempData);
   };
 
   useEffect(() => {
@@ -86,9 +95,26 @@ const DataTable = ({ columns, data, onSettingsChange, settings }) => {
       ...newData[rowIndex],
       [columnId]: value
     };
-    setEditedData(newData);
-    const compressedData = LZString.compress(JSON.stringify(newData));
-    localStorage.setItem('tableData', compressedData);
+    const tableDataLocal = LZString.decompress(localStorage.getItem('tableData'));
+    if (tableDataLocal) {
+      const tableData = JSON.parse(tableDataLocal);
+      setEditedData(newData);
+      const compressedData = LZString.compress(JSON.stringify({
+        ...tableData,
+        [rowIndex]: {
+        ...newData[rowIndex],
+        [columnId]: value
+      }}));
+      localStorage.setItem('tableData', compressedData);
+    } else {
+      setEditedData(newData);
+      const compressedData = LZString.compress(JSON.stringify({
+        [rowIndex]: {
+        ...newData[rowIndex],
+        [columnId]: value
+      }}));
+      localStorage.setItem('tableData', compressedData);
+    }
   };
 
   const handleCellClick = (rowIndex, columnId) => {
@@ -104,6 +130,7 @@ const DataTable = ({ columns, data, onSettingsChange, settings }) => {
     if (editingCell) {
       const { rowIndex, columnId } = editingCell;
       handleCellChange(rowIndex, columnId, value);
+      setEditingCell(null);
     }
   };
 
@@ -216,9 +243,9 @@ const DataTable = ({ columns, data, onSettingsChange, settings }) => {
                           </FormControl>
                         ) : (
                           <TextField
-                            value={cell.value || ''}
-                            onChange={handleInputChange}
-                            onBlur={handleCellBlur}
+                            defaultValue={cell.value || ''}
+                            // onChange={handleInputChange}
+                            onBlur={handleInputChange}
                             autoFocus
                             fullWidth
                           />

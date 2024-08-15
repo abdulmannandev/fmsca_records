@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Tabs, Tab, Select, MenuItem, Button } from '@mui/material';
 import DataTable from './Components/DataTable';
@@ -27,10 +26,10 @@ const App = () => {
 
   return (
     <Container>
-      <Tabs value={view} onChange={(e, newValue) => setView(newValue)}>
+      {/* <Tabs value={view} onChange={(e, newValue) => setView(newValue)}>
         <Tab label="Table View" value="table" />
-        {/* <Tab label="Pivot View" value="pivot" /> */}
-      </Tabs>
+        <Tab label="Pivot View" value="pivot" />
+      </Tabs> */}
 
       {view === 'table' && (
         <DataTable
